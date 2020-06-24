@@ -23,6 +23,7 @@ def main():
   for i in range(len(paths)):
     img = helpers.loadImage(paths[i])
     artifacts = run_artifact_detection(img)
+    drawFigure(img)
     print(f'image {i} ({paths[i]}) has {len(artifacts)} artifacts')
 
 
