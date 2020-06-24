@@ -17,24 +17,49 @@ TOLERANCE = 0.7
 
 # place images to analyze here (relative paths)
 paths = []
-
-
 debug = helpers.debug
 
 def main():
   for i in range(len(paths)):
-    artifacts = analyzeImage(paths[i])
+    img = helpers.loadImage(paths[i])
+    artifacts = run_artifact_detection(img)
     print(f'image {i} ({paths[i]}) has {len(artifacts)} artifacts')
 
-def analyzeImage(path: str):
-  pp = pprint.PrettyPrinter()
-  # load an image
-  img = helpers.loadImage(path)
+
+"""
+## inputs ##
+img: a dicom image as loaded by pydicom.dcmread. Must have scaled_pixel_array attribute with values scaled according to hounsfield scale
+
+## vocabulary ##
+"slice": a donut-shaped section of an image
+"section": an approximately-trapezoid-shaped piece of a slice
+
+## returns ##
+returns array of artifacts, where an artifact is 
+{
+  "slice": int,                 # index of slice
+  "section": int,               # index of section
+  "bounds": {                   # gives the bounds of the affected section
+    "innerRadius": float,
+    "outerRadius": float,
+    "earlyAngle": float,
+    "lateAngle": float,
+    "centerpoint": (int, int),  # x, y coordinates of the section containing an artifact
+  },
+  "sliceMean": float,           # mean of voxel values in slice
+  "sectionMean": float,         # mean of voxel values in section
+  "deviation": float,           # sectionMean - sliceMean
+}
+
+## usage ##
+image has artifacts if len(run_artifact_detection(img)) > 0
+"""
+def run_artifact_detection(img):
   # find the center
   cx, cy, r = helpers.findCenterAndRadius(img)
   # sectionData[sliceNo][sectionNo] gives you array of pixel HU values
   sectionData = [] 
-  # try to read from dump file
+  # try to read from cached dump file if already exists
   fileName = f'{path}.sectionData.dump'
   try:
     with open(fileName, 'rb') as dumpFile:
@@ -77,8 +102,10 @@ def analyzeImage(path: str):
           "sectionMean": sectionMean,
           "deviation": sectionMean - sliceMean
         })
-  # pp.pprint(artifacts)
+  return artifacts
 
+def drawFigure(img):
+  cx, cy, r = helpers.findCenterAndRadius(img)
   # now that I have the artifacts, I need to draw points on the artifacts
   window_center = 1000 + 10
   window_width = 30
@@ -92,8 +119,6 @@ def analyzeImage(path: str):
   drawArtifacts(artifacts, sliceWidth, ax)
   ax.imshow(scaled_img, cmap='gray', vmin=0, vmax=255)
   plt.show()
-  return artifacts
-
 
 def drawArtifacts(artifacts, sliceWidth, ax):
   for a in artifacts:
